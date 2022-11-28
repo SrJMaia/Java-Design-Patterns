@@ -1,0 +1,1 @@
+Behavioral patterns describe how classes and objects interact & communicate with each other
