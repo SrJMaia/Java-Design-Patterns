@@ -234,47 +234,298 @@ This object should not expose teh state for modification.
 match with the state stored in memento.
 
 #### Implementation & Design Considerations
+- It is important to keep an eye on the size of state stored in memento. A solution for discarding older state may be
+needed to handle large memory consumption scenarios.
+- Memento often ends up being an inner class due to the requirement that it must encapsulate all details of what
+is stored in its instance.
+- Resetting to previous state should consider effects on states of other objects/services.
+- If there is definite, fixed way in which mementos are created then we can only store incremental state in mementos.
+This is especially true if we are using command design pattern where every command stored a memento before execution.
+- Mementos can be stored internally by originator as well but this complicates the originator. An external caretaker 
+with fully encapsulated Memento provides you with more flexibility in implementation.
+ 
 #### Pitfalls
-#### Summary
+- In practice creating a snapshot of state may not be easy if other objects are part of originator's state.
+- Resetting a state may not be as simple as copying references. If a state change of originator is tied with other
+parts of application then those parts may become out of sync/invalid due to resetting state.
 
-##
+#### Summary
+- We cab use memento design pattern to take a snapshot of object's state which can be then used to restore object to that
+particular state.
+- Memento itself is created such that it doesn't expose any state stored in it to any other class aside from the originator.
+- Originator provides a method to get a memento out of it. And another method to assign it a memento, which results in
+getting the originator's state reset to the one in memento.
+- Mementos need to be saved for them to be of any use. Originator can save them but it adds complexity.
+- Memento works well with command pattern. Each commands saves a memento as part of execution.
+
+## Observer
+- Using observer design pattern we can notify multiple objects whenever an object changes state.
+- This design pattern is also called as publisher-subscriber or pub-sub.
+- We are defining one-to-many dependency between objects, where many objects are listening for state
+change of a single object, without tightly coupling all of them together.
+- This pattern is often implemented where listener only gets notification that "something" has changed in the 
+object's state. Listeners query back to find out more information if needed. This makes it mroe generic as different
+listeners may be interested in different states.
 
 #### Implementation
-#### Implementation & Design Considerations
-#### Pitfalls
-#### Summary
+- We define an interface for observer. Observer is usually a very simple interface and defines a method used
+by "subject" to notify about state change.
+- Subject can be an interface if we are expecting our observes to listen to multiple objects or else subject can be
+any concrete class.
+- Implementing subject means taking care of handling attach, detach of observers, notifying all registered observers &
+providing a methods to provide state information requested by observers.
+- Concrete observers use a reference passed to them to call "subject" for getting more information about the state.
+If we are passing changed state in notify method then this is not required.
 
-##
+#### Implementation & Design Considerations
+- In some rare scenarios you may end with a circular update loop. i.e. - an update to observable's state results in notification
+being sent to a observer which then takes some action and that action results in state change of our observable,
+triggering another notification and so on. Watch for these!
+- An observer object can listen for changes in multiple subjects. It becomes quite easy to identify originator for
+the notification if subjects pass a reference to themselves in notification to observer.
+- Performance can become an issue if number of observers are higher and if one or many of them need noticeable time
+to process notification. This can also cause pile up of pending notifications or missed notifications.
+- To reduce number of notifications sent on each state update, we can also have observers register for a specific
+property or event. This improves performance as on an event, subject notifies only the interested observers instead of all
+registered observers.
+- Typically, notification are sent by observable when someone changes its state, but we can also make the client code,
+which is changing subject's state, send notification too. This way we get notification when all state changes are done.
+However, client code get this additional responsibility which they may forget to carry out.
+
+#### Pitfalls
+- Every setter method triggering updates may be too much if we have client settign properties one after another
+on our observable.
+- Also each update becomes expensive as no. of observers increase and we have one or more "slow" observers in the list.
+- If observers call back the subject to find what changed then this can add up to quite a bit of overhead.
+
+#### Summary
+- Observer pattern allows to define one-to-many dependency between objects where many objects are interested in state
+change of a object. 
+- Observers register themselves with the subject which then notifies all registered observers if any state change occurs.
+- In the notification sent to observers it is common to only send reference of subject instead of state values. Observers will
+call the subject back for more information if needed.
+- We can also register observers for a specific event only, resulting in improved performance of sending notifications in the
+subject.
+- This design pattern is also known as publisher-subscriber pattern.Java messaging uses this pattern but istead of 
+registering with subject, listeners register with a JMS broker, which acts a middleman.
+
+## State
+- State design pattern allows our objects to behave differently based on its current internal state.
+- This pattern allows to define the state specific behaviors in separate classes.
+- Operations defined in the class delegate to the current state object's implementation of that behavior.
+- State transitions can be triggered by states themselves in which case each state knows about at least one other state's
+existence.
+- A benefit of this pattern is that new states and thus new behaviors can be added without changing our main class.
 
 #### Implementation
-#### Implementation & Design Considerations
-#### Pitfalls
-#### Summary
+- Identify distinct values for state of our object (context). Each state value will be a separate class
+in our implementation. These classes will provide behavior specific to the state value they represent.
+- In our main/context class method implementations we'll delegate the operation to current state object.
+- We have to decide how our state transition is going to happen. States can themselves transition to next
+state based on input received in a method. Other options in context itself can initiate transition.
+- Client interacts with out main class or context and is unaware of existence of state.
 
-##
+#### Implementation & Design Considerations
+- In some implementations clients themselves can configure context with initial state, However after that 
+the state transition is handled either by states or context.
+- If state transitions are done by state object itself then it has to know about at least one state. This adds
+to the amount of code change needed when adding new states.
+- Using flyweight pattern we can share states which do not have any instance variables and only encapsulate behaviour
+specific to that state.
+- State deign pattern is nto the same as a state machine. S state machine is loose terms focuses on state transitions
+based on input values & using some table to map these inputs to states. A state design pattern focuses on providing
+a behaviour specific to a state value of context object.
+
+#### Pitfalls
+- A lot more classes are created for providing functionality of context & all those need unit testing as well.
+- State transitions can be a bit tricky to implement. This becomes more complicated if there multiple possible
+states to which object can transition from current state. And if states are responsible for triggering transitions then
+we have a lto more coupling between states.
+- We may not realize all possible states we need at teh beginning of our design. As our design evolves we may need
+to add more states to handle a particular behavior.
+
+#### Summary
+- If we have an object whose behavior is completely tied to its internal state which can be expressed as an
+object we can use the state pattern.
+- Each possible state value now becomes a class providing behavior specific to a state value.
+- Our main object (aka context) delegates the actual operation to its current state. States will implement behavior
+which is specific to a particular state value.
+- Context object's state change is explicit now, since we change the entire state object.
+- State transitions are handled either by states themselves or context can trigger them.
+- We can reuse state objects if they don't have any instance variables and only provide behavior.
+
+## Strategy
+- Strategy pattern allows us to encapsulate an algorithm in a class. So now we can configure oru context or
+main object with an object of this class, to change the algorithm used to perform given operation.
+- This is really helpful if you have many possible variations of an algorithm.
+- A good indication for applicability of strategy pattern is if we find different algorithms/behaviors in our
+methods which are selected with conditional statements like if-else of witch-case.
+- Strategy classes are usually implemented in an inheritance hierarchy so that we can choose any one implementation
+and it'll work with our main object/context as the interface is same for all implementations.
 
 #### Implementation
-#### Implementation & Design Considerations
-#### Pitfalls
-#### Summary
+- We start by defining strategy interface which is used by our main/context class. Context class provides
+strategy with all the data that it needs.
+- We provide implementations for various algorithms by implementing strategy interface a class per algorithm.
+- Our context class provides a way to configure it with one of the strategy implementations. Client code will create
+context with one of the strategy object.
 
-##
+#### Implementation & Design Considerations
+- We can implement our context in a way where strategy object is optional. This makes context usable for client codes
+who do not want to deal with concrete strategy objects.
+- Strategy objects should be given all data they need as arguments to its method. If number of arguments are high
+then we can pass strategy an interface reference which it requires for data. Context object can implement this interface
+and pass itself to strategy.
+- Strategies typically end up being stateless objects making them perfect candidates for sharing between context
+objects.
+- Strategy implementations can make use of inheritance to factor out common parts of algorithms in base classes making
+child implementation simpler.
+- Since strategy objects often end up with no state of their own, we can use flyweight pattern to share them between
+multiple context objects.
+
+#### Pitfalls
+- Since client code configure context object with appropriate strategy object, clients know about all implementations
+of strategy, Introducing new algorithm means changing client code as well.
+
+#### Summary
+- Strategy pattern allows us to encapsulate algorithms in separate classes. The class using these algorithms 
+(called context) can now be configured with desired implementation of an algorithm.
+- It is typically the responsibility of client code which is using oru context object to configure it.
+- Strategy objects are given all data they need by the context object. We can pass data either in form of
+arguments or pass on context object itself.
+- Strategy objects typically end up being stateless making them great candidates for flyweight pattern.
+- Client code ends up knowing about all implementations of strategy since it has no create their objects.
+
+## Template
+- Using template method design pattern we define an algorithm in a method as a series of steps (method calls) and
+provide a chance for subclasses to define or redefine some of these steps.
+- The pattern works by defining abstract methods which then have to be implemented by concrete subclasses.
+These methods are like hooks which are then called by template method.
+- This pattern allows yo uto defer implementation of parts of your algorithm which can vary or change.
+- Template methods are an example of inversion of control principle - Don't call us, we'll call you! And this if 
+of course referring to the way template method calls other methods implemented in subclass.
 
 #### Implementation
-#### Implementation & Design Considerations
-#### Pitfalls
-#### Summary
+- We start by defining oru algorithm in template method. We try to break algorithm in multiple steps where each
+step will become an abstract method.
+- While breaking down algorithm the number of steps should not be too many or it can become quite tedious to
+implement all of them in subclasses.
+- Next we implement the abstract steps in one or more subclasses.
 
-##
+#### Implementation & Design Considerations
+- A balance must be kept in how much granular we want to keep our steps. Too many steps means too many methods to override
+for subclass where each one may be just a primitive operation. Too few steps on the other hand would mean
+subclasses end up defining the major parts of algorithm.
+- If needed the templated method can be made final to prevent subclasses for changing base algorithm.
+- We can use inheritance within subclasses to reuse parts from already implemented steps. This approach
+allows subclasses to only change steps they need.
+- Factory method design pattern uses template method. Actual factory method is often called as part of another template
+method.
+
+#### Pitfalls
+- Tracking down what code executed as part of our algorithm requires looking up multiple classes. The problem becomes
+more apparent if subclasses themselves start using inheritance themselves to reuse only some of the existing steps
+& customize a few.
+- Unit testing can become a little more difficult as the individual steps may require some specific state 
+values to be present.
+
+#### Summary
+- Template method allow us to define a skeleton of an algorithm in base class. Steps of algorithm are defined
+as abstract methods in base class.
+- Subclasses of our abstract class will provide implementation of steps. This way we can have different implementations
+for same algorithm.
+- Client will create object of any of the concrete subclasses and use the algorithm.
+- Factory method design pattern is often implemented as part of template method design pattern.
+- One drawback of template method is algorithm implementation is now spread across multiple classes so
+it makes it slightly difficult to understand.
+
+## Visitor
+- Visitor pattern allows us to define new operations that can be performed on an object without changing the class
+definition of the object. 
+- Think of this pattern as an object ("visitor") that visits all nodes in an object structure. Each time our visitor
+visits a particular object from the object structure, that object calls a specific method on visitor, passing itself
+as an argument.
+- Each time we need a new operation we create a subclass of visitor, implement the operation in that class and
+visit the object structure.
+- Objects themselves only implement an "accept" visit where the visitor is pass as an argument. Object know about the
+method in visitor created specifically for it and invoke that method inside the accept method.
 
 #### Implementation
-#### Implementation & Design Considerations
-#### Pitfalls
-#### Summary
+- We create visitor interface by defining "visit" methods for each class we want to support.
+- The classes who want functionalities provided by visitor define "accept" method which accepts a visitor.
+These methods are defined using the visitor interface paramater type so that we can pass any class implementing
+the visitor for these methods.
+- In the accept method implementation we'll call a method on visitor which is defined specificalyl for that class.
+- Next we implement the visitor interface in one or more classes. Each implementation provides a specific functionality
+for interested classes. If want another feature we create new implementation of visitor.
 
-##
+#### Implementation & Design Considerations
+- Visitor can work with objects of classes which do not have a common parent. So having a common interface for those
+classes is optional. however the code which passes our visitor to these objects must be aware of these individual classes.
+- Often visitors need access to internal state of objects to carry our their work. So we may have to expose the state
+using getters/setters.
+- One effect of this pattern is that related functionality if grouped in a single visitor class instead of spread
+across multiple classes. So adding new functionality is as simple as adding a new visitor class.
+- Visitors can also accumulate state. So along with behavior we can also have state per object in oru visitor. We don't
+have to add new state to objects for behavior defined in visitor.
+- Visitor can be used to add new functionality to object structure implemented using composite or can be used for
+doing interpretation in interpreter design pattern.
+
+#### Pitfalls
+- Often visitors need access to object's state. So we end up exposing a lot of state through getter methods, weakening the
+encapsulation.
+- Supporting a new class in our visitors requires changes to all visitor implementations.
+- If the classes themselves change then all visitors have to change as well since they have to work with changed class.
+- A little confusing to understand and implement.
+
+#### Summary
+- Visitor pattern allows to add new operation that work on objects without modifying class definitions of these
+objects.
+- Visitors define class specific methods which work with an object of that class to provide new functionality.
+- To use this pattern classes define a simple accept method which gets a reference to a visitor and inside this
+method, objects class method on visitor which is defined for that specific class.
+- Adding a new functionality means creating a new visitor and implementing new functionality in that class instead of
+modifying each class where this functionality is needed.
+- This pattern is often used where we have an object structure and then another class or visitor itself iterates over
+this structure passing oru visitor object to each object.
+
+## Null Object
+- We use "null" value to represent an absence of object. Using "Null Object" pattern we can provide  an alternate
+representation to indicate an absence of object.
+- Most important characteristic of a null object is that it'll basically do nothing & store nothing when an operations
+called on it.
+- Null object seems like a proxy as it stands in for a real object, however a proxy at some point will use real object
+or transform to a real object & e ven in absence of the real object proxy will provide some behaviour with side effect.
+Null object will not do any such thing. Null objects don't transform into real objects.
+- We use this pattern when we want to treat absence of a collaborator transparently without null checks.
 
 #### Implementation
+- We create a new class that represents our null object by extending from base class or implementing given interface.
+- In the null object implementation, for each method we'll not do anything. however doing nothing can mean different things
+in different implementations. E.g. if a method in a null object return something then we can either return another null object,
+a predefined default value or null.
+
 #### Implementation & Design Considerations
+- Class which is using Null Object should no have todo anything special when working with this object.
+- What "do nothing" means for an operation can be different in different classes. This is especially true
+where methods in null objects are expected to return values.
+- If you find a need where your null object has to transform into a real object then you better use something like
+state pattern with a null object as one of the states.
+- Since null objects don't have a state & no complex behavior they are good candidates for singleton pattern.
+We can use a single instance of a null object everywhere.
+- Null objects are useful in many other design patterns like state - to represent a null state, in strategy pattern
+to provide a strategy where no action is taken on input.
+
 #### Pitfalls
+- Creating a proper Null object may not be possible for all classes. Some classes may be expected to cause a 
+change, and absence of that change may cause other class operations to fail.
+- Finding what "do nothing" means may not be easy or possible. If our null object method is expected to return
+another object then this problem is more apparent.
+
 #### Summary
+- Null object pattern allows us to represent absence of real object as a do nothing object.
+- Method implementations in a Null object will not do anything. In case a return value is expected, these methods
+will return a sensible, hard-coded default value.
+- Classes which use Null object won't be aware of presence of this special implementation. Whole purpose of the
+pattern is to avoid null checks in other classes.
+- Null objects do not transform into real objects, nor do they use indirection to real objects.
